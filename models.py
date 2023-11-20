@@ -7,8 +7,8 @@ import torch.nn.functional as F
 # can use the below import should you choose to initialize the weights of your Net
 import torch.nn.init as I
 
-dtype = torch.cuda.FloatTensor
-device = torch.device("cuda:0")
+# dtype = torch.cuda.FloatTensor
+# device = torch.device("cuda:0")
 #nn = nn.cuda()
 
 class BasicNN(nn.Module):

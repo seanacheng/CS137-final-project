@@ -1,8 +1,7 @@
 from os.path import join, expanduser
 
 
-root = expanduser("")
-imagesets = join(root, 'DATASETS', 'IMAGE')
-videosets = join(root, 'DATASETS', 'VIDEO')
-models = join(root, 'Models')
-plots = join(root, 'Plots')
+root = r"C:\Users\seana\Homework\DNN_Final_Project"
+imagesets = join(root, 'data', 'imagesets')
+models = join(root, 'CS137-final-project', 'models')
+plots = join(root, 'CS137-final-project', 'plots')

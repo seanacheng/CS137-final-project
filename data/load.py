@@ -6,16 +6,7 @@ from data.oxford_flowers import flowers
 import configs
 
 def load_datasets(set_name, input_size=224):
-    if set_name == 'mnist':
-        train_dataset = datasets.MNIST(root=os.path.join(configs.imagesets, 'MNIST'),
-                                                   train=True,
-                                                   transform=transforms.ToTensor(),
-                                                   download=True)
-        test_dataset = datasets.MNIST(root=os.path.join(configs.imagesets, 'MNIST'),
-                                                  train=False,
-                                                  transform=transforms.ToTensor())
-
-    elif set_name == 'stanford_dogs':
+    if set_name == 'stanford_dogs':
         input_transforms = transforms.Compose([
             transforms.RandomResizedCrop(input_size, ratio=(1, 1.3)),
             transforms.RandomHorizontalFlip(),
