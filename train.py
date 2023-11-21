@@ -44,8 +44,8 @@ def train_model(batch_size, n_epochs, learning_rate,
         os.makedirs(plot_path, exist_ok=True)
 
     # Load network and use GPU
-    net = models.Net2()
-    cudnn.benchmark = True
+    net = models.DogBreedPretrainedGoogleNet()
+    # cudnn.benchmark = True
 
     # Load dataset
     train_data, test_data, classes = load_datasets(set_name)
@@ -72,10 +72,10 @@ def train_model(batch_size, n_epochs, learning_rate,
     # plt.clf()
 
     # cross entropy loss combines softmax and nn.NLLLoss() in one single class.
-    criterion = nn.NLLLoss()
+    criterion = nn.CrossEntropyLoss()
 
     # stochastic gradient descent with a small learning rate
-    optimizer = optim.SGD(net.parameters(), lr=learning_rate)
+    optimizer = optim.AdamW(net.parameters(), lr=learning_rate)
 
     # ToDo: Add to utils
     # Calculate accuracy before training
@@ -101,15 +101,16 @@ def train_model(batch_size, n_epochs, learning_rate,
     # calculate the accuracy
     # to convert `correct` from a Tensor into a scalar, use .item()
     accuracy = 100.0 * correct.item() / total
-
-    # print('Accuracy before training: ', accuracy)
+    print('Accuracy before training: ', accuracy)
 
     def train(n_epochs):
         net.train()
         loss_over_time = [] # to track the loss as the network trains
 
         for epoch in range(n_epochs):  # loop over the dataset multiple times
-            output_epoch = epoch + saved_epoch
+            output_epoch = epoch
+            if saved_epoch is not None:
+                 output_epoch += saved_epoch
             running_loss = 0.0
 
             for batch_i, data in enumerate(train_loader):
@@ -142,14 +143,14 @@ def train_model(batch_size, n_epochs, learning_rate,
                     loss_over_time.append(avg_loss)
                     print('Epoch: {}, Batch: {}, Avg. Loss: {}'.format(output_epoch + 1, batch_i+1, avg_loss))
                     running_loss = 0.0
-            if output_epoch % 100 == 99: # save every 100 epochs
-                torch.save(net.state_dict(), 'saved_models/Net2_{}.pt'.format(output_epoch + 1))
+            # if output_epoch % 100 == 99: # save every 100 epochs
+            #     torch.save(net.state_dict(), 'saved_models/GoogLeNet_{}.pt'.format(output_epoch + 1))
 
         print('Finished Training')
         return loss_over_time
 
-    if saved_epoch:
-        net.load_state_dict(torch.load('saved_models/Net2_{}.pt'.format(saved_epoch)))
+    # if saved_epoch:
+    #     net.load_state_dict(torch.load('saved_models/GoogLeNet_{}.pt'.format(saved_epoch)))
 
     # call train and record the loss over time
     training_loss = train(n_epochs)
@@ -256,7 +257,7 @@ def parse_args():
     parser.add_argument('--batch_size', help='Batch_size', default=64, type=int)
     parser.add_argument('--n_epochs', help='Number of Epochs', default=5, type=int)
     parser.add_argument('--learning_rate', help='Learning Rate', default=0.01, type=float)
-    parser.add_argument('--saved_epoch', help='epoch of saved model', default=0, type=int)
+    parser.add_argument('--saved_epoch', help='epoch of saved model', default=None, type=int)
     parser.add_argument('--run_id', help='Used to help identify artifacts', default=0, type=int)
     args = parser.parse_args()
     return args
