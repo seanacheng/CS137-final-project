@@ -22,6 +22,16 @@ import models
 # assert torch.cuda.is_available(), 'Error: CUDA not found!'
 
 def main():
+
+    # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    # print(torch.version.cuda)
+    # print(torch.cuda.is_available())
+    # if device.type == "cuda":
+    #     total_mem = torch.cuda.get_device_properties(0).total_memory
+    # else:
+    #     total_mem = 0 
+    # print("MEM: ", total_mem)
+    # print(device.type)
     args = parse_args()
     train_model(batch_size=args.batch_size,
                 n_epochs=args.n_epochs,
@@ -43,9 +53,26 @@ def train_model(batch_size, n_epochs, learning_rate,
         plot_path = os.path.join(plot_path, "run_{}".format(run_id))
         os.makedirs(plot_path, exist_ok=True)
 
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(torch.version.cuda)
+    print(torch.cuda.is_available())
+    if device.type == "cuda":
+        total_mem = torch.cuda.get_device_properties(0).total_memory
+    else:
+        total_mem = 0 
+    print("MEM: ", total_mem)
+    print(device.type)
+
     # Load network and use GPU
     net = models.DogBreedPretrainedGoogleNet()
     # cudnn.benchmark = True
+    if torch.cuda.device_count() > 1:
+        print("Let's use", torch.cuda.device_count(), "GPUs!")
+    # 使用所有可用的 GPU
+    net = nn.DataParallel(net)
+
+    net = net.to(device)
+
 
     # Load dataset
     train_data, test_data, classes = load_datasets(set_name)
@@ -53,23 +80,6 @@ def train_model(batch_size, n_epochs, learning_rate,
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
 
-    # # obtain one batch of training images
-    # dataiter = iter(train_loader)
-    # images, labels = dataiter.next()
-    # images = np.swapaxes(np.swapaxes(images.numpy(), 1, 2), 2, 3)
-
-    # # plot the images in the batch, along with the corresponding labels
-    # fig = plt.figure(figsize=(batch_size/4+5, batch_size/4+5))
-    # for idx in np.arange(batch_size):
-    #     ax = fig.add_subplot(batch_size/8, 8, idx+1, xticks=[], yticks=[])
-    #     ax.imshow(images[idx])
-    #     ax.set_title(classes[labels[idx]], {'fontsize': batch_size/5}, pad=0.4)
-    # plt.tight_layout(pad=1, w_pad=0, h_pad=0)
-    # if plot_path:
-    #     plt.savefig(os.path.join(plot_path, "Initial_Visualization"))
-    # else:
-    #     plt.show()
-    # plt.clf()
 
     # cross entropy loss combines softmax and nn.NLLLoss() in one single class.
     criterion = nn.CrossEntropyLoss()
@@ -84,7 +94,7 @@ def train_model(batch_size, n_epochs, learning_rate,
 
     # Iterate through test dataset
     for images, labels in test_loader:
-        images, labels = images, labels
+        images, labels = images.to(device), labels.to(device)
 
         # forward pass to get outputs
         # the outputs are a series of class scores
@@ -116,7 +126,7 @@ def train_model(batch_size, n_epochs, learning_rate,
             for batch_i, data in enumerate(train_loader):
                 # get the input images and their corresponding labels
                 inputs, labels = data
-                inputs, labels = inputs, labels
+                inputs, labels = inputs.to(device), labels.to(device)
 
                 # zero the parameter (weight) gradients
                 optimizer.zero_grad()
@@ -146,6 +156,8 @@ def train_model(batch_size, n_epochs, learning_rate,
             # if output_epoch % 100 == 99: # save every 100 epochs
             #     torch.save(net.state_dict(), 'saved_models/GoogLeNet_{}.pt'.format(output_epoch + 1))
 
+        torch.save(net, os.path.join(save_path, "final_model_complete.sav"))
+        print("Training completed and model saved.")
         print('Finished Training')
         return loss_over_time
 
@@ -172,7 +184,7 @@ def train_model(batch_size, n_epochs, learning_rate,
     plt.clf()
 
     # initialize tensor and lists to monitor test loss and accuracy
-    test_loss = torch.zeros(1)
+    test_loss = torch.zeros(1).to(device)
     class_correct = list(0. for i in range(len(classes)))
     class_total = list(0. for i in range(len(classes)))
 
@@ -185,16 +197,17 @@ def train_model(batch_size, n_epochs, learning_rate,
 
         # get the input images and their corresponding labels
         inputs, labels = data
-        inputs, labels = inputs, labels
+        inputs, labels = inputs.to(device), labels.to(device)
 
         # forward pass to get outputs
         outputs = net(inputs)
 
         # calculate the loss
-        loss = criterion(outputs, labels)
+        loss = criterion(outputs, labels.long())
 
         # update average test loss
-        test_loss = test_loss + ((torch.ones(1) / (batch_i + 1)) * (loss.data - test_loss))
+        #test_loss = test_loss + ((torch.ones(1) / (batch_i + 1)) * (loss.data - test_loss))
+        test_loss = test_loss + ((torch.ones(1, device=device) / (batch_i + 1)) * (loss.data - test_loss))
 
         # get the predicted class from the maximum value in the output-list of class scores
         _, predicted = torch.max(outputs.data, 1)
@@ -232,13 +245,13 @@ def train_model(batch_size, n_epochs, learning_rate,
         fig.clf()
         # obtain one batch of test images
         dataiter = iter(test_loader)
-        images, labels = dataiter.next()
+        images, labels = next(dataiter)
         images, labels = images, labels
         # get predictions
         preds = np.squeeze(net(images).data.max(1, keepdim=True)[1].cpu().numpy())
         images = np.swapaxes(np.swapaxes(images.cpu().numpy(), 1, 2), 2, 3)
         for idx in np.arange(batch_size):
-            ax = fig.add_subplot(batch_size/8, 8, idx+1, xticks=[], yticks=[])
+            ax = fig.add_subplot(batch_size//8, 8, idx+1, xticks=[], yticks=[])
             ax.imshow(images[idx])
             if preds[idx]==labels[idx]:
                 ax.set_title("{}".format(classes[preds[idx]], classes[labels[idx]]), color="green")
@@ -255,7 +268,7 @@ def train_model(batch_size, n_epochs, learning_rate,
 def parse_args():
     parser = argparse.ArgumentParser(description='PyTorch DML Training')
     parser.add_argument('--batch_size', help='Batch_size', default=64, type=int)
-    parser.add_argument('--n_epochs', help='Number of Epochs', default=5, type=int)
+    parser.add_argument('--n_epochs', help='Number of Epochs', default=1, type=int)
     parser.add_argument('--learning_rate', help='Learning Rate', default=0.01, type=float)
     parser.add_argument('--saved_epoch', help='epoch of saved model', default=None, type=int)
     parser.add_argument('--run_id', help='Used to help identify artifacts', default=0, type=int)

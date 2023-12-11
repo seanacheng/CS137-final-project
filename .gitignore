@@ -11,3 +11,8 @@ Plots/*
 # downloaded datasets
 DATASETS/*
 data/*.mat
+data/imagesets
+data/*
+!data/.py
+
+CS137-final-project
